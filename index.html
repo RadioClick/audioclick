@@ -935,7 +935,7 @@ body.light .ad-footer {
 <script>
 // AUDIO EMBEBIDO
 // PLAYLIST DE 10 ARCHIVOS MP3
-const playlist = ['capsula1.mp3','capsula2.mp3','capsula3.mp3','capsula4.mp3','capsula5.mp3','capsula6.mp3','capsula7.mp3','capsula8.mp3','capsula9.mp3','capsula10.mp3'];
+const playlist = ['audio/capsula1.mp3','audio/capsula2.mp3','audio/capsula3.mp3','audio/capsula4.mp3','audio/capsula5.mp3','audio/capsula6.mp3','audio/capsula7.mp3','audio/capsula8.mp3','audio/capsula9.mp3','audio/capsula10.mp3'];
 let currentTrack = 0;
 
 // ELEMENTOS
@@ -945,10 +945,23 @@ let hasLiked = false;
 let hasDisliked = false;
 let isMuted = false;
 
-// Cargar audio
+// Cargar audio con autoplay
 audio.src = playlist[currentTrack];
-audio.addEventListener('ended', () => { currentTrack = (currentTrack + 1) % playlist.length; audio.src = playlist[currentTrack]; if (!audio.paused) audio.play(); });
 audio.volume = 0.7;
+
+// Loop infinito entre canciones
+audio.addEventListener('ended', () => { 
+  currentTrack = (currentTrack + 1) % playlist.length; 
+  audio.src = playlist[currentTrack]; 
+  audio.play(); // Reproducir automáticamente la siguiente
+});
+
+// AUTOPLAY al cargar la página
+window.addEventListener('load', () => {
+  audio.play().catch(err => {
+    console.log('Autoplay bloqueado - usuario debe dar click en play');
+  });
+});
 
 // FIREBASE CONFIG
 const FIREBASE_URL = 'https://radio-click-default-rtdb.firebaseio.com/counters.json';
