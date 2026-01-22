@@ -986,7 +986,8 @@ function showJoinButton() {
     currentTrack = syncPosition.track;
     audio.src = playlist[currentTrack];
     
-    audio.addEventListener('loadedmetadata', () => {
+    audio.addEventListener('canplay', () => {
+      console.log(`🎵 Sincronizando: Capsula ${currentTrack + 1} en ${Math.floor(syncPosition.time / 60)}m ${syncPosition.time % 60}s`);
       if (audio.duration > syncPosition.time) {
         audio.currentTime = syncPosition.time;
       }
@@ -1005,7 +1006,9 @@ function showJoinButton() {
 
 // Intentar autoplay al cargar
 window.addEventListener('load', () => {
-  audio.addEventListener('loadedmetadata', () => {
+  // Esperar a que el audio esté completamente cargado
+  audio.addEventListener('canplay', () => {
+    console.log(`🎵 Sincronizando: Capsula ${currentTrack + 1} en ${Math.floor(syncPosition.time / 60)}m ${syncPosition.time % 60}s`);
     if (audio.duration > syncPosition.time) {
       audio.currentTime = syncPosition.time;
     }
@@ -1404,7 +1407,7 @@ scheduleNextComment();
 
 // COMPARTIR
 function shareWhatsApp() {
-  const text = encodeURIComponent('bit.ly/AudioClickMed');
+  const text = encodeURIComponent('radioclick.github.io/audioclick/');
   window.open(`https://wa.me/?text=${text}`, '_blank');
 }
 
