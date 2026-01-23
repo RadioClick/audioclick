@@ -872,6 +872,23 @@ body.light .ad-footer {
 <!-- COMENTARIOS EN VIVO -->
 <div class="comments-card">
   <div class="comments-header">💬 Comentarios en vivo</div>
+  
+  <!-- INPUT PARA USUARIOS -->
+  <div style="padding: 10px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="userCommentInput" placeholder="Escribe tu comentario..." 
+             style="flex: 1; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border); 
+                    background: var(--bg); color: var(--text); font-size: 0.9em;"
+             maxlength="100">
+      <button onclick="sendUserComment()" 
+              style="padding: 8px 20px; border-radius: 20px; border: none; 
+                     background: var(--primary); color: white; cursor: pointer; 
+                     font-weight: 600; font-size: 0.9em;">
+        Enviar
+      </button>
+    </div>
+  </div>
+  
   <div class="comments-container" id="commentsContainer"></div>
 </div>
 
@@ -1335,8 +1352,125 @@ const commentTexts = ["Excelente información, gracias Radio Click! 📻", "Muy 
 const emojiOnly = ["👏👏👏", "🔥🔥", "❤️❤️❤️", "👍👍", "🎉🎊", "💪💪💪", "⭐⭐⭐⭐⭐", "🙌", "👌👌", "💯", "🎵🎶", "📻❤️", "🔝", "✨✨✨", "💙💚💛", "🤩", "😍😍", "🥰", "👏🔥", "💖💕", "🎯💯", "🚀🚀", "⚡⚡⚡", "💎", "🏆", "❤️‍🔥", "🙏🙏", "👌💯", "🔥❤️", "🎊🎉🎊"];
 
 let comments = [];
-const maxComments = 5;
+const maxComments = 10; // Aumentado para mostrar más comentarios
 let lastUsedNames = [];
+
+// FIREBASE REALTIME COMMENTS
+const COMMENTS_URL = 'https://audio-click-default-rtdb.firebaseio.com/comments.json';
+let lastCommentCheck = Date.now();
+
+// Función para enviar comentario de usuario
+async function sendUserComment() {
+  const input = document.getElementById('userCommentInput');
+  const text = input.value.trim();
+  
+  if (!text || text.length < 2) {
+    showNotification('⚠️ Escribe un mensaje más largo');
+    return;
+  }
+  
+  // Pedir nombre al usuario la primera vez
+  let userName = localStorage.getItem('userName');
+  if (!userName) {
+    userName = prompt('¿Cómo te llamas? (Tu nombre aparecerá en los comentarios)');
+    if (!userName || userName.trim().length < 2) {
+      userName = 'Oyente ' + Math.floor(Math.random() * 9000 + 1000);
+    } else {
+      userName = userName.trim().substring(0, 25); // Máximo 25 caracteres
+    }
+    localStorage.setItem('userName', userName);
+    showNotification(`¡Hola ${userName}! 👋`);
+  }
+  
+  const comment = {
+    author: userName,
+    text: text,
+    timestamp: Date.now(),
+    isUser: true
+  };
+  
+  try {
+    await fetch(COMMENTS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(comment)
+    });
+    
+    input.value = '';
+    showNotification('✅ Comentario enviado!');
+    
+    // Agregar inmediatamente a la lista local
+    comments.unshift({
+      author: userName + ' 🎙️',
+      text: text,
+      time: 'Ahora',
+      isEmoji: false,
+      isUser: true
+    });
+    if (comments.length > maxComments) comments.pop();
+    renderComments();
+    
+  } catch (err) {
+    showNotification('❌ Error al enviar comentario');
+    console.error('Error:', err);
+  }
+}
+
+// Detectar Enter en input
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('userCommentInput');
+  if (input) {
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendUserComment();
+      }
+    });
+  }
+});
+
+// Función para obtener comentarios de Firebase
+async function fetchUserComments() {
+  try {
+    const response = await fetch(COMMENTS_URL + '?orderBy="timestamp"&limitToLast=20');
+    if (!response.ok) return;
+    
+    const data = await response.json();
+    if (!data) return;
+    
+    // Convertir a array y ordenar por timestamp
+    const userComments = Object.values(data)
+      .filter(c => c.timestamp > lastCommentCheck)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 5);
+    
+    // Agregar nuevos comentarios
+    userComments.forEach(c => {
+      const timeAgo = Math.floor((Date.now() - c.timestamp) / 60000);
+      const timeText = timeAgo < 1 ? 'Ahora' : `Hace ${timeAgo} min`;
+      
+      comments.unshift({
+        author: c.author + ' 🎙️',
+        text: c.text,
+        time: timeText,
+        isEmoji: false,
+        isUser: true
+      });
+    });
+    
+    if (userComments.length > 0) {
+      lastCommentCheck = Date.now();
+      if (comments.length > maxComments) {
+        comments = comments.slice(0, maxComments);
+      }
+      renderComments();
+    }
+  } catch (err) {
+    console.log('Error fetching comments:', err);
+  }
+}
+
+// Verificar nuevos comentarios cada 5 segundos
+setInterval(fetchUserComments, 5000);
 
 function addComment() {
   let randomName;
@@ -1360,7 +1494,8 @@ function addComment() {
     author: randomName,
     text: randomText,
     time: `Hace ${timeAgo} min`,
-    isEmoji: isEmojiOnly
+    isEmoji: isEmojiOnly,
+    isUser: false
   };
   
   comments.unshift(comment);
@@ -1374,7 +1509,7 @@ function addComment() {
 function renderComments() {
   const container = document.getElementById('commentsContainer');
   container.innerHTML = comments.map(c => `
-    <div class="comment">
+    <div class="comment" style="${c.isUser ? 'background: rgba(255,107,53,0.1); border-left: 3px solid var(--primary);' : ''}">
       <div class="comment-author">${c.author}</div>
       <div class="comment-text ${c.isEmoji ? 'emoji-only' : ''}">${c.text}</div>
       <div class="comment-time">${c.time}</div>
