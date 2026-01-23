@@ -820,6 +820,7 @@ body.light .ad-footer {
   }
 }
 </style>
+<!-- v3.1 -->
 </head>
 
 <body>
@@ -1372,14 +1373,71 @@ async function sendUserComment() {
   // Pedir nombre al usuario la primera vez
   let userName = localStorage.getItem('userName');
   if (!userName) {
-    userName = prompt('¿Cómo te llamas? (Tu nombre aparecerá en los comentarios)');
-    if (!userName || userName.trim().length < 2) {
-      userName = 'Oyente ' + Math.floor(Math.random() * 9000 + 1000);
-    } else {
-      userName = userName.trim().substring(0, 25); // Máximo 25 caracteres
-    }
-    localStorage.setItem('userName', userName);
-    showNotification(`¡Hola ${userName}! 👋`);
+    // Crear popup personalizado
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    
+    const popup = document.createElement('div');
+    popup.style.cssText = 'background:var(--bg-card);padding:30px;border-radius:20px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);';
+    popup.innerHTML = `
+      <h3 style="color:var(--primary);margin:0 0 10px 0;font-size:1.3em;">Audio Click</h3>
+      <p style="color:var(--text);margin:0 0 20px 0;">¿Cómo te llamas? (Tu nombre aparecerá en los comentarios)</p>
+      <input type="text" id="nameInput" placeholder="Tu nombre" maxlength="25" 
+             style="width:100%;padding:12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-size:1em;margin-bottom:15px;box-sizing:border-box;">
+      <div style="display:flex;gap:10px;">
+        <button onclick="document.getElementById('cancelNameBtn').click()" 
+                style="flex:1;padding:12px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-weight:600;">
+          Cancelar
+        </button>
+        <button onclick="document.getElementById('confirmNameBtn').click()" 
+                style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--primary);color:white;cursor:pointer;font-weight:600;">
+          Aceptar
+        </button>
+      </div>
+    `;
+    
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    
+    const nameInput = document.getElementById('nameInput');
+    nameInput.focus();
+    
+    // Esperar respuesta del usuario
+    await new Promise((resolve) => {
+      const confirmBtn = document.createElement('button');
+      confirmBtn.id = 'confirmNameBtn';
+      confirmBtn.style.display = 'none';
+      confirmBtn.onclick = () => {
+        userName = nameInput.value.trim();
+        if (!userName || userName.length < 2) {
+          userName = 'Oyente ' + Math.floor(Math.random() * 9000 + 1000);
+        } else {
+          userName = userName.substring(0, 25);
+        }
+        localStorage.setItem('userName', userName);
+        overlay.remove();
+        showNotification(`¡Hola ${userName}! 👋`);
+        resolve();
+      };
+      
+      const cancelBtn = document.createElement('button');
+      cancelBtn.id = 'cancelNameBtn';
+      cancelBtn.style.display = 'none';
+      cancelBtn.onclick = () => {
+        overlay.remove();
+        resolve();
+        return;
+      };
+      
+      document.body.appendChild(confirmBtn);
+      document.body.appendChild(cancelBtn);
+      
+      nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') confirmBtn.click();
+      });
+    });
+    
+    if (!userName) return; // Usuario canceló
   }
   
   const comment = {
