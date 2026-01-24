@@ -1574,7 +1574,15 @@ function generateSyncedComments() {
 }
 
 function updateComments() {
-  comments = generateSyncedComments();
+  // Guardar comentarios de usuarios
+  const userComments = comments.filter(c => c.isUser);
+  
+  // Regenerar solo comentarios programados
+  const programmedComments = generateSyncedComments();
+  
+  // Combinar: usuarios primero, luego programados
+  comments = [...userComments, ...programmedComments].slice(0, maxComments);
+  
   renderComments();
 }
 
