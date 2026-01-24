@@ -1076,64 +1076,41 @@ async function updateGlobalCounts(listeners, subscribers, likes, dislikes) {
 }
 
 async function initializeCounters() {
-  const globalCounts = await fetchGlobalCounts();
-  let listeners, subscribers, likes, dislikes;
-  const isOnline = globalCounts !== null;
-
-  if (isOnline) {
-    listeners = globalCounts.listeners;
-    subscribers = globalCounts.subscribers;
-    likes = globalCounts.likes;
-    dislikes = globalCounts.dislikes;
-    localStorage.setItem('lastListeners', listeners);
-    localStorage.setItem('lastSubscribers', subscribers);
-    localStorage.setItem('lastLikes', likes);
-    localStorage.setItem('lastDislikes', dislikes);
-    localStorage.setItem('lastSync', Date.now());
-  } else {
-    const lastListeners = localStorage.getItem('lastListeners');
-    const lastSync = localStorage.getItem('lastSync');
-    
-    if (lastListeners) {
-      const hoursSinceSync = lastSync ? (Date.now() - parseInt(lastSync)) / (1000 * 60 * 60) : 0;
-      const growth = Math.floor(hoursSinceSync * (Math.random() * 10 + 5));
-      listeners = parseInt(lastListeners) + growth;
-      subscribers = parseInt(localStorage.getItem('lastSubscribers')) + Math.floor(growth * 0.2);
-      likes = parseInt(localStorage.getItem('lastLikes')) + Math.floor(growth * 0.15);
-      dislikes = parseInt(localStorage.getItem('lastDislikes')) + Math.floor(growth * 0.01);
-    } else {
-      listeners = 137258;
-      subscribers = 57103;
-      likes = 41120;
-      dislikes = 711;
-    }
-  }
-
-  // Incremento por visita
-  const listenersIncrease = Math.floor(Math.random() * 6) + 10;
-  const subscribersIncrease = Math.floor(Math.random() * 4) + 2;
-  const likesIncrease = Math.floor(Math.random() * 6) + 3;
-  const dislikesIncrease = Math.floor(Math.random() * 3);
+  // SINCRONÍA GLOBAL POR TIEMPO (sin Firebase)
+  // Fecha base: 23 de enero 2026, 00:00:00
+  const BASE_DATE = new Date('2026-01-23T00:00:00').getTime();
+  const BASE_LISTENERS = 137258;
+  const BASE_SUBSCRIBERS = 57103;
+  const BASE_LIKES = 41120;
+  const BASE_DISLIKES = 711;
   
-  listeners += listenersIncrease;
-  subscribers += subscribersIncrease;
-  likes += likesIncrease;
-  dislikes += dislikesIncrease;
-
+  // Calcular horas transcurridas desde la fecha base
+  const now = Date.now();
+  const hoursPassed = (now - BASE_DATE) / (1000 * 60 * 60);
+  
+  // Crecimiento por hora (promedio)
+  const HOURLY_GROWTH_LISTENERS = 12;  // ~12 oyentes/hora
+  const HOURLY_GROWTH_SUBSCRIBERS = 3; // ~3 suscritos/hora
+  const HOURLY_GROWTH_LIKES = 5;       // ~5 likes/hora
+  const HOURLY_GROWTH_DISLIKES = 0.5;  // ~0.5 dislikes/hora
+  
+  // Calcular valores globales sincronizados
+  let listeners = Math.floor(BASE_LISTENERS + (hoursPassed * HOURLY_GROWTH_LISTENERS));
+  let subscribers = Math.floor(BASE_SUBSCRIBERS + (hoursPassed * HOURLY_GROWTH_SUBSCRIBERS));
+  let likes = Math.floor(BASE_LIKES + (hoursPassed * HOURLY_GROWTH_LIKES));
+  let dislikes = Math.floor(BASE_DISLIKES + (hoursPassed * HOURLY_GROWTH_DISLIKES));
+  
+  // Variación aleatoria pequeña para simular actividad en tiempo real
+  const variance = Math.floor(Math.random() * 5);
+  listeners += variance;
+  subscribers += Math.floor(variance * 0.3);
+  likes += Math.floor(variance * 0.4);
+  
   updateDisplay(listeners, subscribers, likes, dislikes);
   localStorage.setItem('listenerCount', listeners);
   localStorage.setItem('subscriberCount', subscribers);
   localStorage.setItem('likeCount', likes);
   localStorage.setItem('dislikeCount', dislikes);
-
-  if (isOnline) {
-    await updateGlobalCounts(listeners, subscribers, likes, dislikes);
-    localStorage.setItem('lastListeners', listeners);
-    localStorage.setItem('lastSubscribers', subscribers);
-    localStorage.setItem('lastLikes', likes);
-    localStorage.setItem('lastDislikes', dislikes);
-    localStorage.setItem('lastSync', Date.now());
-  }
 
   // Restaurar estados
   if (localStorage.getItem('subscribed') === 'true') {
@@ -1530,37 +1507,41 @@ async function fetchUserComments() {
 // Verificar nuevos comentarios cada 5 segundos
 setInterval(fetchUserComments, 5000);
 
-function addComment() {
-  let randomName;
-  do {
-    randomName = commentNames[Math.floor(Math.random() * commentNames.length)];
-  } while (lastUsedNames.includes(randomName));
+// SINCRONÍA GLOBAL DE COMENTARIOS POR TIMESTAMP
+function generateSyncedComments() {
+  const now = Date.now();
+  const MINUTE_MS = 60000;
+  const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
   
-  lastUsedNames.unshift(randomName);
-  if (lastUsedNames.length > 5) {
-    lastUsedNames.pop();
+  // Generar comentarios de los últimos 30 minutos
+  const syncedComments = [];
+  
+  for (let i = 0; i < 10; i++) {
+    const minutesAgo = i * 3; // Cada 3 minutos
+    const commentTime = now - (minutesAgo * MINUTE_MS);
+    const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
+    
+    // Usar timestamp como semilla para generar siempre el mismo comentario
+    const nameIndex = minutesSinceBase % commentNames.length;
+    const isEmojiOnly = (minutesSinceBase % 4) === 0; // 25% emojis
+    const textIndex = minutesSinceBase % (isEmojiOnly ? emojiOnly.length : commentTexts.length);
+    
+    const comment = {
+      author: commentNames[nameIndex],
+      text: isEmojiOnly ? emojiOnly[textIndex] : commentTexts[textIndex],
+      time: minutesAgo === 0 ? 'Ahora' : `Hace ${minutesAgo} min`,
+      isEmoji: isEmojiOnly,
+      isUser: false
+    };
+    
+    syncedComments.push(comment);
   }
   
-  const isEmojiOnly = Math.random() < 0.25;
-  const randomText = isEmojiOnly 
-    ? emojiOnly[Math.floor(Math.random() * emojiOnly.length)]
-    : commentTexts[Math.floor(Math.random() * commentTexts.length)];
-  
-  const timeAgo = Math.floor(Math.random() * 5) + 1;
-  
-  const comment = {
-    author: randomName,
-    text: randomText,
-    time: `Hace ${timeAgo} min`,
-    isEmoji: isEmojiOnly,
-    isUser: false
-  };
-  
-  comments.unshift(comment);
-  if (comments.length > maxComments) {
-    comments.pop();
-  }
-  
+  return syncedComments;
+}
+
+function updateComments() {
+  comments = generateSyncedComments();
   renderComments();
 }
 
@@ -1575,17 +1556,9 @@ function renderComments() {
   `).join('');
 }
 
-setTimeout(addComment, 2000);
-
-function scheduleNextComment() {
-  const delay = (Math.random() * 15000) + 15000;
-  setTimeout(() => {
-    addComment();
-    scheduleNextComment();
-  }, delay);
-}
-
-scheduleNextComment();
+// Actualizar comentarios cada 30 segundos
+updateComments();
+setInterval(updateComments, 30000);
 
 
 // COMPARTIR
