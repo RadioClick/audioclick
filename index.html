@@ -1505,33 +1505,44 @@ async function fetchUserComments() {
     });
     
     // Convertir a array y filtrar comentarios recientes
-    const userComments = Object.values(data)
-      .filter(c => now - c.timestamp <= ONE_HOUR) // Solo últimos 60 min
-      .filter(c => c.timestamp > lastCommentCheck)
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 5);
-    
-    // Agregar nuevos comentarios
-    userComments.forEach(c => {
-      const timeAgo = Math.floor((now - c.timestamp) / 60000);
-      const timeText = timeAgo < 1 ? 'Ahora' : `Hace ${timeAgo} min`;
-      
-      comments.unshift({
-        author: c.author + ' 🎙️',
+    const userComments = Object.entries(data)
+      .filter(([key, c]) => now - c.timestamp <= ONE_HOUR) // Solo últimos 60 min
+      .sort(([, a], [, b]) => b.timestamp - a.timestamp)
+      .slice(0, 5)
+      .map(([key, c]) => ({
+        key,
+        author: c.author,
         text: c.text,
-        time: timeText,
-        isEmoji: false,
-        isUser: true
-      });
+        timestamp: c.timestamp
+      }));
+    
+    // Limpiar comentarios viejos del array local
+    comments = comments.filter(c => !c.isUser || (now - (c.originalTimestamp || 0)) <= ONE_HOUR);
+    
+    // Agregar comentarios de Firebase (evitar duplicados)
+    const existingTexts = new Set(comments.filter(c => c.isUser).map(c => c.text));
+    
+    userComments.forEach(c => {
+      if (!existingTexts.has(c.text)) {
+        const timeAgo = Math.floor((now - c.timestamp) / 60000);
+        const timeText = timeAgo < 1 ? 'Ahora' : `Hace ${timeAgo} min`;
+        
+        comments.unshift({
+          author: c.author + ' 🎙️',
+          text: c.text,
+          time: timeText,
+          isEmoji: false,
+          isUser: true,
+          originalTimestamp: c.timestamp
+        });
+      }
     });
     
-    if (userComments.length > 0) {
-      lastCommentCheck = now;
-      if (comments.length > maxComments) {
-        comments = comments.slice(0, maxComments);
-      }
-      renderComments();
+    if (comments.length > maxComments) {
+      comments = comments.slice(0, maxComments);
     }
+    
+    renderComments();
   } catch (err) {
     console.log('Error fetching comments:', err);
   }
