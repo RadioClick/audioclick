@@ -1482,15 +1482,38 @@ async function fetchUserComments() {
     const data = await response.json();
     if (!data) return;
     
-    // Convertir a array y ordenar por timestamp
+    const ONE_HOUR = 60 * 60 * 1000; // 1 hora en milisegundos
+    const now = Date.now();
+    
+    // Eliminar comentarios viejos (más de 1 hora)
+    const commentsToDelete = [];
+    Object.keys(data).forEach(key => {
+      if (now - data[key].timestamp > ONE_HOUR) {
+        commentsToDelete.push(key);
+      }
+    });
+    
+    // Borrar comentarios viejos de Firebase
+    commentsToDelete.forEach(async (key) => {
+      try {
+        await fetch(`https://audio-click-default-rtdb.firebaseio.com/comments/${key}.json`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.log('Error deleting old comment:', err);
+      }
+    });
+    
+    // Convertir a array y filtrar comentarios recientes
     const userComments = Object.values(data)
+      .filter(c => now - c.timestamp <= ONE_HOUR) // Solo últimos 60 min
       .filter(c => c.timestamp > lastCommentCheck)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 5);
     
     // Agregar nuevos comentarios
     userComments.forEach(c => {
-      const timeAgo = Math.floor((Date.now() - c.timestamp) / 60000);
+      const timeAgo = Math.floor((now - c.timestamp) / 60000);
       const timeText = timeAgo < 1 ? 'Ahora' : `Hace ${timeAgo} min`;
       
       comments.unshift({
@@ -1503,7 +1526,7 @@ async function fetchUserComments() {
     });
     
     if (userComments.length > 0) {
-      lastCommentCheck = Date.now();
+      lastCommentCheck = now;
       if (comments.length > maxComments) {
         comments = comments.slice(0, maxComments);
       }
