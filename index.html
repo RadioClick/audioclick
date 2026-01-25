@@ -1306,71 +1306,74 @@ function formatTime(seconds) {
 let liveCount = 0;
 let isOnlineGlobal = false;
 let lastPeakValue = null; // Para mantener estabilidad en picos
+let stableValue = null; // Para estabilidad aleatoria de 2 min
+let stableUntil = 0; // Timestamp hasta cuándo mantener estable
 
 function calculateLiveListeners() {
   const now = new Date();
   const hour = now.getHours();
   const minute = now.getMinutes();
-  const dayOfWeek = now.getDay(); // 0=domingo, 6=sábado
+  const dayOfWeek = now.getDay();
+  const nowTimestamp = Date.now();
   
-  // Horas pico radiales (6-9 AM, 12-2 PM, 5-8 PM)
+  // ESTABILIDAD ALEATORIA DE 2 MINUTOS (15% probabilidad)
+  if (nowTimestamp > stableUntil && Math.random() < 0.15) {
+    stableUntil = nowTimestamp + (120 * 1000);
+  }
+  
+  if (nowTimestamp <= stableUntil && stableValue) {
+    const microVariation = Math.floor(Math.random() * 3) - 1;
+    stableValue = Math.max(stableValue + microVariation, 180);
+    return stableValue;
+  }
+  
   const isMorningPeak = hour >= 6 && hour < 9;
   const isLunchPeak = hour >= 12 && hour < 14;
   const isEveningPeak = hour >= 17 && hour < 20;
   const isPeakHour = isMorningPeak || isLunchPeak || isEveningPeak;
-  
-  // Fin de semana tiene más audiencia
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   
-  // Base según hora del día
   let baseListeners;
   if (isPeakHour) {
-    baseListeners = 2400 + (isWeekend ? 800 : 0); // Picos: 2400-3200+
+    baseListeners = 2400 + (isWeekend ? 800 : 0);
   } else if (hour >= 22 || hour < 6) {
-    baseListeners = 450; // Madrugada: mínimo 450
+    baseListeners = 250; // Madrugada: ~180-350
   } else if (hour >= 9 && hour < 12) {
-    baseListeners = 1100; // Mañana: 1100-1500
+    baseListeners = 1100;
   } else if (hour >= 14 && hour < 17) {
-    baseListeners = 950; // Tarde: 950-1300
+    baseListeners = 950;
   } else {
-    baseListeners = 750; // Noche: 750-1100
+    baseListeners = 750;
   }
   
-  // ESTABILIDAD EN MOMENTOS NOTABLES
-  // Durante horas pico, mantener valor más estable (60% del tiempo)
   if (isPeakHour) {
     if (lastPeakValue && Math.random() < 0.60) {
-      // 60% mantener valor cercano al anterior (±2%)
       const stabilityVariation = (Math.random() - 0.5) * (lastPeakValue * 0.04);
-      const stableValue = Math.floor(lastPeakValue + stabilityVariation);
-      lastPeakValue = stableValue;
-      return Math.max(stableValue, 380);
+      const stableVal = Math.floor(lastPeakValue + stabilityVariation);
+      lastPeakValue = stableVal;
+      return Math.max(stableVal, 180);
     }
   }
   
-  // Variación natural basada en minuto (onda senoidal suave)
   const minuteWave = Math.sin((minute / 60) * Math.PI * 2) * (baseListeners * 0.15);
+  let randomVariation = isPeakHour ? 
+    (Math.random() - 0.5) * (baseListeners * 0.10) : 
+    (Math.random() - 0.5) * (baseListeners * 0.24);
   
-  // Variación aleatoria ajustada
-  let randomVariation;
-  if (isPeakHour) {
-    // En picos: variación más pequeña (±5%) para estabilidad
-    randomVariation = (Math.random() - 0.5) * (baseListeners * 0.10);
-  } else {
-    // Fuera de picos: variación normal (±8%)
-    randomVariation = (Math.random() - 0.5) * (baseListeners * 0.16);
-  }
-  
-  // Cálculo final
   const total = Math.floor(baseListeners + minuteWave + randomVariation);
   
   if (isPeakHour) {
     lastPeakValue = total;
   } else {
-    lastPeakValue = null; // Resetear fuera de picos
+    lastPeakValue = null;
   }
   
-  return Math.max(total, 380); // Nunca menos de 380
+  const finalValue = Math.max(total, 180);
+  if (nowTimestamp <= stableUntil) {
+    stableValue = finalValue;
+  }
+  
+  return finalValue;
 }
 
 function updateLiveCount() {
@@ -1400,9 +1403,9 @@ setInterval(updateLiveCount, 3000);
 // COMENTARIOS EN VIVO
 const commentNames = ["María González", "Carlos Rodríguez", "Ana Martínez", "José López", "Laura Fernández", "Miguel Ángel", "Carmen Silva", "Roberto Díaz", "Patricia Morales", "Fernando Castro", "Isabel Vargas", "Diego Ramos", "Sofía Herrera", "Andrés Mendoza", "Valentina Cruz", "Juan Pablo", "Gabriela Torres", "Luis Eduardo", "Camila Rojas", "Sebastián Ortiz", "Daniela Reyes", "Alejandro Ruiz", "Natalia Jiménez", "Ricardo Vega", "Carolina Flores", "Mauricio Pérez", "Verónica Sánchez", "Pablo Aguirre", "Claudia Ramírez", "Javier Molina", "Sandra Ospina", "Felipe Gutiérrez", "Mónica Ríos", "Gustavo Parra", "Liliana Cardona", "Raúl Mejía", "Gloria Salazar", "Héctor Zapata", "Beatriz Muñoz", "Óscar Henao", "Mariana Duque", "Julián Arango", "Teresa Gómez", "Sergio Valencia", "Adriana Betancur", "Iván Montoya", "Cristina Londoño", "Mario Suárez", "Paola Escobar", "Rodrigo Vélez", "Amparo Giraldo", "Álvaro Correa", "Diana Botero", "Fabián Uribe", "Lucía Calle", "Ernesto Mesa", "Silvia Arbeláez", "Hernán Jaramillo", "Pilar Echeverri", "Guillermo Ossa", "Yolanda Posada", "Arturo Rendón", "Blanca Hincapié", "Eduardo Franco", "Martha Toro", "Julio Gaviria", "Rosa Quintero", "Alfredo Castaño", "Esperanza Marulanda", "Antonio Castrillón", "Elena Arboleda", "Vicente Pérez", "Miriam Soto", "Leonardo Rojas", "Cecilia Ocampo", "Francisco Villa", "Inés Naranjo", "Gabriel Tamayo", "Rocío Marín", "Manuel Galeano", "Olga Saldarriaga", "Pedro Rincón", "Ligia Aristizábal", "Rubén López", "Amparo Mesa", "Jaime Zapata", "Luz Marina Díaz", "Alberto Ramírez", "Clara González", "Jorge Castro", "Marta Gómez", "Hugo Fernández", "Nora Rodríguez", "Rafael Vargas", "Stella Morales", "Armando Sierra", "Dora Jiménez", "Esteban Ruiz", "Blanca Reyes", "Camilo Ortiz"];
 
-const commentTexts = ["Excelente información, gracias Radio Click! 📻", "Muy buena transmisión como siempre 👏", "Los escucho todos los días, saludos desde Medellín! 🎙️", "Gran trabajo equipo, sigan así! 💪", "Me encanta esta emisora, muy profesional ⭐", "Contenido de calidad, felicitaciones! 🎉", "Siempre al día con las noticias, gracias! 📰", "La mejor radio de Medellín sin duda 🔥", "Información clara y precisa, excelente! ✅", "Los sigo desde hace meses, muy buenos! 🎧", "Saludos desde el centro de Medellín! 👋", "Me gusta mucho el formato de las cápsulas 📡", "Súper útil la información, gracias! 💯", "Esperando la próxima transmisión! ⏰", "Compartiendo con mis amigos 🔗", "Muy profesional el contenido 🎯", "Noticias actualizadas, perfecto! 📣", "Los escucho mientras trabajo, genial! 💼", "Calidad en cada emisión 🌟", "Saludos desde Antioquia! 🏔️", "Me mantienen informado siempre 📲", "Gran labor informativa 📻", "Sigan adelante con este proyecto! 🚀", "Contenido muy bien estructurado 📊", "Los recomiendo 100%! 👍", "Excelente locución y claridad 🎤", "Información local muy valiosa 📍", "Primera vez que escucho, me gustó! ⭐", "Ya me suscribí, no me los pierdo! 📧", "Buena cobertura de noticias 📢", "Los amo, mejor radio! ❤️", "Gracias por mantenernos informados 💙", "Me encanta Radio Click! 💚", "Contenido de corazón ❤️‍🔥", "Los sigo con mucho cariño 🧡", "Hermoso trabajo! 💖", "Radio con alma 💛", "Los quiero mucho! 💜", "Amor por esta radio 💕", "De lo mejor! 💗"];
+const commentTexts = ["Excelente información, gracias Radio Click! 📻", "Muy buena transmisión como siempre 👏", "Los escucho todos los días, saludos desde Medellín! 🎙️", "Gran trabajo equipo, sigan así! 💪", "Me encanta esta emisora, muy profesional ⭐", "Contenido de calidad, felicitaciones! 🎉", "Siempre al día con las noticias, gracias! 📰", "La mejor radio de Medellín sin duda 🔥", "Información clara y precisa, excelente! ✅", "Los sigo desde hace meses, muy buenos! 🎧", "Saludos desde el centro de Medellín! 👋", "Me gusta mucho el formato de las cápsulas 📡", "Súper útil la información, gracias! 💯", "Esperando la próxima transmisión! ⏰", "Compartiendo con mis amigos 🔗", "Muy profesional el contenido 🎯", "Noticias actualizadas, perfecto! 📣", "Los escucho mientras trabajo, genial! 💼", "Calidad en cada emisión 🌟", "Saludos desde Antioquia! 🏔️", "Me mantienen informado siempre 📲", "Gran labor informativa 📻", "Sigan adelante con este proyecto! 🚀", "Contenido muy bien estructurado 📊", "Los recomiendo 100%! 👍", "Excelente locución y claridad 🎤", "Información local muy valiosa 📍", "Primera vez que escucho, me gustó! ⭐", "Ya me suscribí, no me los pierdo! 📧", "Buena cobertura de noticias 📢", "Los amo, mejor radio! ❤️", "Gracias por mantenernos informados 💙", "Me encanta Radio Click! 💚", "Contenido de corazón ❤️‍🔥", "Los sigo con mucho cariño 🧡", "Hermoso trabajo! 💖", "Radio con alma 💛", "Los quiero mucho! 💜", "Amor por esta radio 💕", "De lo mejor! 💗", "Qué elegancia de emisora, saludos desde Aranjuez", "Reportando desde el Metro, la mejor compañía", "Esa canción me puso a vibrar parceros 🔥", "Desde Envigado escuchándolos a todo taco", "Qué berraquera de programación 💪", "Saludos desde la Comuna 13, pura buena vibra", "Bajando por las Palmas con el mejor sonido 🎶", "La mejor radio de Medallo sin duda", "Desde Itagüí pongan una de las viejitas", "La mejor compañía para el trancón 🚗", "Desde Robledo conectados", "Activo desde Atanasio Girardot ⚽", "Pilotando el bus con ustedes 🚌", "Desde Sabaneta escuchándolos", "En el taxi con la mejor música 🚕", "Reportando desde Cali 🎺", "Desde Barranquilla pegado a la web", "Saludos desde Bogotá ☕", "En Bucaramanga no nos perdemos el programa", "Desde Cartagena activados 🏖️", "Saludos desde Pereira", "En Manizales conectados", "Desde Montería con calor y buena música 🌴", "Reportando desde Neiva", "Desde Popayán la ciudad blanca", "Saludos desde Santa Marta 🌊", "En Villavicencio toda la oficina escuchando", "Desde Cúcuta en la frontera", "Saludos desde Armenia", "En Valledupar pongan acordeón 🎹"];
 
-const emojiOnly = ["👏👏👏", "🔥🔥", "❤️❤️❤️", "👍👍", "🎉🎊", "💪💪💪", "⭐⭐⭐⭐⭐", "🙌", "👌👌", "💯", "🎵🎶", "📻❤️", "🔝", "✨✨✨", "💙💚💛", "🤩", "😍😍", "🥰", "👏🔥", "💖💕", "🎯💯", "🚀🚀", "⚡⚡⚡", "💎", "🏆", "❤️‍🔥", "🙏🙏", "👌💯", "🔥❤️", "🎊🎉🎊"];
+const emojiOnly = ["👏👏👏", "🔥🔥", "❤️❤️❤️", "👍👍", "🎉🎊", "💪💪💪", "⭐⭐⭐⭐⭐", "🙌", "👌👌", "💯", "🎵🎶", "📻❤️", "🔝", "✨✨✨", "💙💚💛", "🤩", "😍😍", "🥰", "👏🔥", "💖💕", "🎯💯", "🚀🚀", "⚡⚡⚡", "💎", "🏆", "❤️‍🔥", "🙏🙏", "👌💯", "🔥❤️", "🎊🎉🎊", "🏔️🔥", "🎙️🎶", "😎💥", "☕✨", "🤝🚀", "🎤🎸", "🔊💪", "🎧❤️", "🏙️🎨", "🚇🦁"];
 
 let comments = [];
 const maxComments = 10; // Aumentado para mostrar más comentarios
