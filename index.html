@@ -1302,12 +1302,13 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// CONECTADOS AHORA - SINCRONÍA GLOBAL
+// CONECTADOS AHORA - PICOS DINÁMICOS DIARIOS
 let liveCount = 0;
 let isOnlineGlobal = false;
-let lastPeakValue = null; // Para mantener estabilidad en picos
-let stableValue = null; // Para estabilidad aleatoria de 2 min
-let stableUntil = 0; // Timestamp hasta cuándo mantener estable
+let lastLiveValue = 180;
+let dailyPeakMultiplier = null;
+let lastPeakDate = null;
+let frozenUntil = 0;
 
 function calculateLiveListeners() {
   const now = new Date();
@@ -1316,64 +1317,84 @@ function calculateLiveListeners() {
   const dayOfWeek = now.getDay();
   const nowTimestamp = Date.now();
   
-  // ESTABILIDAD ALEATORIA DE 2 MINUTOS (15% probabilidad)
-  if (nowTimestamp > stableUntil && Math.random() < 0.15) {
-    stableUntil = nowTimestamp + (120 * 1000);
+  // PICO MÁXIMO DIARIO SINCRONIZADO
+  const today = now.toDateString();
+  if (lastPeakDate !== today) {
+    const seed = now.getDate();
+    if (dayOfWeek === 5 || dayOfWeek === 6) {
+      dailyPeakMultiplier = 1.5 + (seed % 10) * 0.15; // 1.5-2.85 (Viernes/Sábado)
+    } else if (dayOfWeek === 0) {
+      dailyPeakMultiplier = 1.2 + (seed % 8) * 0.1; // 1.2-1.9 (Domingo)
+    } else {
+      dailyPeakMultiplier = 1.0 + (seed % 8) * 0.1; // 1.0-1.7 (Lunes-Jueves)
+    }
+    lastPeakDate = today;
   }
   
-  if (nowTimestamp <= stableUntil && stableValue) {
-    const microVariation = Math.floor(Math.random() * 3) - 1;
-    stableValue = Math.max(stableValue + microVariation, 180);
-    return stableValue;
+  // CONGELACIÓN ALEATORIA (10% probabilidad, 1-2 min)
+  if (nowTimestamp > frozenUntil && Math.random() < 0.10) {
+    frozenUntil = nowTimestamp + ((60 + Math.random() * 60) * 1000);
   }
   
+  if (nowTimestamp <= frozenUntil) {
+    return lastLiveValue; // Mantener valor exacto
+  }
+  
+  // MADRUGADA ESTRICTA (2-6 AM)
+  if (hour >= 2 && hour < 6) {
+    const targetValue = 180 + Math.floor(Math.random() * 41) - 20; // 180±20
+    const difference = targetValue - lastLiveValue;
+    const smoothed = lastLiveValue + (difference * 0.05); // Suavizado 5%
+    lastLiveValue = Math.floor(smoothed);
+    return Math.max(lastLiveValue, 160);
+  }
+  
+  // HORARIOS Y BASES
   const isMorningPeak = hour >= 6 && hour < 9;
   const isLunchPeak = hour >= 12 && hour < 14;
   const isEveningPeak = hour >= 17 && hour < 20;
   const isPeakHour = isMorningPeak || isLunchPeak || isEveningPeak;
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isFridaySaturday = dayOfWeek === 5 || dayOfWeek === 6;
   
   let baseListeners;
   if (isPeakHour) {
-    baseListeners = 2400 + (isWeekend ? 800 : 0);
-  } else if (hour >= 22 || hour < 6) {
-    baseListeners = 250; // Madrugada: ~180-350
+    // HORA PICO TRÁFICO (5-8 PM) - Disparo orgánico
+    if (hour >= 17 && hour < 20) {
+      baseListeners = 3200;
+      
+      // VIERNES/SÁBADO 6 PM+ - MULTIPLICADOR ORGÁNICO x1.8
+      if (isFridaySaturday && hour >= 18) {
+        baseListeners = Math.floor(baseListeners * 1.8 * dailyPeakMultiplier);
+      } else {
+        baseListeners = Math.floor(baseListeners * dailyPeakMultiplier);
+      }
+    } else {
+      baseListeners = 2400 + (isWeekend ? 600 : 0);
+      baseListeners = Math.floor(baseListeners * dailyPeakMultiplier);
+    }
   } else if (hour >= 9 && hour < 12) {
     baseListeners = 1100;
   } else if (hour >= 14 && hour < 17) {
     baseListeners = 950;
+  } else if (hour >= 20 && hour < 22) {
+    baseListeners = 850;
   } else {
-    baseListeners = 750;
+    baseListeners = 250; // Madrugada normal
   }
   
-  if (isPeakHour) {
-    if (lastPeakValue && Math.random() < 0.60) {
-      const stabilityVariation = (Math.random() - 0.5) * (lastPeakValue * 0.04);
-      const stableVal = Math.floor(lastPeakValue + stabilityVariation);
-      lastPeakValue = stableVal;
-      return Math.max(stableVal, 180);
-    }
-  }
+  // Variación natural
+  const minuteWave = Math.sin((minute / 60) * Math.PI * 2) * (baseListeners * 0.12);
+  const randomVariation = (Math.random() - 0.5) * (baseListeners * 0.18);
   
-  const minuteWave = Math.sin((minute / 60) * Math.PI * 2) * (baseListeners * 0.15);
-  let randomVariation = isPeakHour ? 
-    (Math.random() - 0.5) * (baseListeners * 0.10) : 
-    (Math.random() - 0.5) * (baseListeners * 0.24);
+  const targetValue = Math.floor(baseListeners + minuteWave + randomVariation);
   
-  const total = Math.floor(baseListeners + minuteWave + randomVariation);
+  // SUAVIZADO GRADUAL (5% transición)
+  const difference = targetValue - lastLiveValue;
+  const smoothed = lastLiveValue + (difference * 0.05);
+  lastLiveValue = Math.floor(smoothed);
   
-  if (isPeakHour) {
-    lastPeakValue = total;
-  } else {
-    lastPeakValue = null;
-  }
-  
-  const finalValue = Math.max(total, 180);
-  if (nowTimestamp <= stableUntil) {
-    stableValue = finalValue;
-  }
-  
-  return finalValue;
+  return Math.max(lastLiveValue, 180);
 }
 
 function updateLiveCount() {
@@ -1400,16 +1421,25 @@ checkConnection();
 setInterval(checkConnection, 5000);
 setInterval(updateLiveCount, 3000);
 
-// COMENTARIOS EN VIVO
-const commentNames = ["María González", "Carlos Rodríguez", "Ana Martínez", "José López", "Laura Fernández", "Miguel Ángel", "Carmen Silva", "Roberto Díaz", "Patricia Morales", "Fernando Castro", "Isabel Vargas", "Diego Ramos", "Sofía Herrera", "Andrés Mendoza", "Valentina Cruz", "Juan Pablo", "Gabriela Torres", "Luis Eduardo", "Camila Rojas", "Sebastián Ortiz", "Daniela Reyes", "Alejandro Ruiz", "Natalia Jiménez", "Ricardo Vega", "Carolina Flores", "Mauricio Pérez", "Verónica Sánchez", "Pablo Aguirre", "Claudia Ramírez", "Javier Molina", "Sandra Ospina", "Felipe Gutiérrez", "Mónica Ríos", "Gustavo Parra", "Liliana Cardona", "Raúl Mejía", "Gloria Salazar", "Héctor Zapata", "Beatriz Muñoz", "Óscar Henao", "Mariana Duque", "Julián Arango", "Teresa Gómez", "Sergio Valencia", "Adriana Betancur", "Iván Montoya", "Cristina Londoño", "Mario Suárez", "Paola Escobar", "Rodrigo Vélez", "Amparo Giraldo", "Álvaro Correa", "Diana Botero", "Fabián Uribe", "Lucía Calle", "Ernesto Mesa", "Silvia Arbeláez", "Hernán Jaramillo", "Pilar Echeverri", "Guillermo Ossa", "Yolanda Posada", "Arturo Rendón", "Blanca Hincapié", "Eduardo Franco", "Martha Toro", "Julio Gaviria", "Rosa Quintero", "Alfredo Castaño", "Esperanza Marulanda", "Antonio Castrillón", "Elena Arboleda", "Vicente Pérez", "Miriam Soto", "Leonardo Rojas", "Cecilia Ocampo", "Francisco Villa", "Inés Naranjo", "Gabriel Tamayo", "Rocío Marín", "Manuel Galeano", "Olga Saldarriaga", "Pedro Rincón", "Ligia Aristizábal", "Rubén López", "Amparo Mesa", "Jaime Zapata", "Luz Marina Díaz", "Alberto Ramírez", "Clara González", "Jorge Castro", "Marta Gómez", "Hugo Fernández", "Nora Rodríguez", "Rafael Vargas", "Stella Morales", "Armando Sierra", "Dora Jiménez", "Esteban Ruiz", "Blanca Reyes", "Camilo Ortiz"];
+// COMENTARIOS EN VIVO - SISTEMA EXTERNO
+let commentsDatabase = [];
+let commentsLoaded = false;
 
-const commentTexts = ["Excelente información, gracias Radio Click! 📻", "Muy buena transmisión como siempre 👏", "Los escucho todos los días, saludos desde Medellín! 🎙️", "Gran trabajo equipo, sigan así! 💪", "Me encanta esta emisora, muy profesional ⭐", "Contenido de calidad, felicitaciones! 🎉", "Siempre al día con las noticias, gracias! 📰", "La mejor radio de Medellín sin duda 🔥", "Información clara y precisa, excelente! ✅", "Los sigo desde hace meses, muy buenos! 🎧", "Saludos desde el centro de Medellín! 👋", "Me gusta mucho el formato de las cápsulas 📡", "Súper útil la información, gracias! 💯", "Esperando la próxima transmisión! ⏰", "Compartiendo con mis amigos 🔗", "Muy profesional el contenido 🎯", "Noticias actualizadas, perfecto! 📣", "Los escucho mientras trabajo, genial! 💼", "Calidad en cada emisión 🌟", "Saludos desde Antioquia! 🏔️", "Me mantienen informado siempre 📲", "Gran labor informativa 📻", "Sigan adelante con este proyecto! 🚀", "Contenido muy bien estructurado 📊", "Los recomiendo 100%! 👍", "Excelente locución y claridad 🎤", "Información local muy valiosa 📍", "Primera vez que escucho, me gustó! ⭐", "Ya me suscribí, no me los pierdo! 📧", "Buena cobertura de noticias 📢", "Los amo, mejor radio! ❤️", "Gracias por mantenernos informados 💙", "Me encanta Radio Click! 💚", "Contenido de corazón ❤️‍🔥", "Los sigo con mucho cariño 🧡", "Hermoso trabajo! 💖", "Radio con alma 💛", "Los quiero mucho! 💜", "Amor por esta radio 💕", "De lo mejor! 💗", "Qué elegancia de emisora, saludos desde Aranjuez", "Reportando desde el Metro, la mejor compañía", "Esa canción me puso a vibrar parceros 🔥", "Desde Envigado escuchándolos a todo taco", "Qué berraquera de programación 💪", "Saludos desde la Comuna 13, pura buena vibra", "Bajando por las Palmas con el mejor sonido 🎶", "La mejor radio de Medallo sin duda", "Desde Itagüí pongan una de las viejitas", "La mejor compañía para el trancón 🚗", "Desde Robledo conectados", "Activo desde Atanasio Girardot ⚽", "Pilotando el bus con ustedes 🚌", "Desde Sabaneta escuchándolos", "En el taxi con la mejor música 🚕", "Reportando desde Cali 🎺", "Desde Barranquilla pegado a la web", "Saludos desde Bogotá ☕", "En Bucaramanga no nos perdemos el programa", "Desde Cartagena activados 🏖️", "Saludos desde Pereira", "En Manizales conectados", "Desde Montería con calor y buena música 🌴", "Reportando desde Neiva", "Desde Popayán la ciudad blanca", "Saludos desde Santa Marta 🌊", "En Villavicencio toda la oficina escuchando", "Desde Cúcuta en la frontera", "Saludos desde Armenia", "En Valledupar pongan acordeón 🎹"];
-
-const emojiOnly = ["👏👏👏", "🔥🔥", "❤️❤️❤️", "👍👍", "🎉🎊", "💪💪💪", "⭐⭐⭐⭐⭐", "🙌", "👌👌", "💯", "🎵🎶", "📻❤️", "🔝", "✨✨✨", "💙💚💛", "🤩", "😍😍", "🥰", "👏🔥", "💖💕", "🎯💯", "🚀🚀", "⚡⚡⚡", "💎", "🏆", "❤️‍🔥", "🙏🙏", "👌💯", "🔥❤️", "🎊🎉🎊", "🏔️🔥", "🎙️🎶", "😎💥", "☕✨", "🤝🚀", "🎤🎸", "🔊💪", "🎧❤️", "🏙️🎨", "🚇🦁"];
+// Cargar base de datos de comentarios desde archivo
+fetch('comentarios_audioclick.txt')
+  .then(r => r.text())
+  .then(data => {
+    commentsDatabase = data.split('\n').filter(l => l.trim());
+    commentsLoaded = true;
+    console.log(`✅ ${commentsDatabase.length} comentarios cargados`);
+  })
+  .catch(err => {
+    console.log('⚠️ Usando comentarios de respaldo');
+    commentsLoaded = true;
+  });
 
 let comments = [];
-const maxComments = 10; // Aumentado para mostrar más comentarios
-let lastUsedNames = [];
+const maxComments = 10;
 
 // FIREBASE REALTIME COMMENTS
 const COMMENTS_URL = 'https://audio-click-default-rtdb.firebaseio.com/comments.json';
@@ -1621,32 +1651,29 @@ setInterval(fetchUserComments, 5000);
 
 // SINCRONÍA GLOBAL DE COMENTARIOS POR TIMESTAMP
 function generateSyncedComments() {
+  if (!commentsLoaded || commentsDatabase.length === 0) return [];
+  
   const now = Date.now();
   const MINUTE_MS = 60000;
   const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
-  
-  // Generar comentarios de los últimos 30 minutos
   const syncedComments = [];
   
   for (let i = 0; i < 10; i++) {
-    const minutesAgo = i * 3; // Cada 3 minutos
+    const minutesAgo = i * 3;
     const commentTime = now - (minutesAgo * MINUTE_MS);
     const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
+    const lineIndex = minutesSinceBase % commentsDatabase.length;
+    const parts = commentsDatabase[lineIndex].split('|');
     
-    // Usar timestamp como semilla para generar siempre el mismo comentario
-    const nameIndex = minutesSinceBase % commentNames.length;
-    const isEmojiOnly = (minutesSinceBase % 4) === 0; // 25% emojis
-    const textIndex = minutesSinceBase % (isEmojiOnly ? emojiOnly.length : commentTexts.length);
-    
-    const comment = {
-      author: commentNames[nameIndex],
-      text: isEmojiOnly ? emojiOnly[textIndex] : commentTexts[textIndex],
-      time: minutesAgo === 0 ? 'Ahora' : `Hace ${minutesAgo} min`,
-      isEmoji: isEmojiOnly,
-      isUser: false
-    };
-    
-    syncedComments.push(comment);
+    if (parts.length >= 3) {
+      syncedComments.push({
+        author: parts[0].trim(),
+        text: parts[2].trim(),
+        time: minutesAgo === 0 ? 'Ahora' : `Hace ${minutesAgo} min`,
+        isEmoji: false,
+        isUser: false
+      });
+    }
   }
   
   return syncedComments;
