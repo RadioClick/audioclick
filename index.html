@@ -1662,7 +1662,9 @@ function generateSyncedComments() {
     const minutesAgo = i * 3;
     const commentTime = now - (minutesAgo * MINUTE_MS);
     const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
-    const lineIndex = minutesSinceBase % commentsDatabase.length;
+    
+    // Usar hash multiplicativo para orden aleatorio pero sincronizado
+    const lineIndex = (minutesSinceBase * 7919) % commentsDatabase.length;
     const parts = commentsDatabase[lineIndex].split('|');
     
     if (parts.length >= 3) {
