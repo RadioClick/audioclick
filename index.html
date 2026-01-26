@@ -1663,8 +1663,9 @@ function generateSyncedComments() {
     const commentTime = now - (minutesAgo * MINUTE_MS);
     const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
     
-    // Usar hash multiplicativo para orden aleatorio pero sincronizado
-    const lineIndex = (minutesSinceBase * 7919) % commentsDatabase.length;
+    // Usar hash multiplicativo con número coprimo (3001 es coprimo con 5000)
+    // Esto asegura distribución uniforme en TODAS las líneas del archivo
+    const lineIndex = (minutesSinceBase * 3001) % commentsDatabase.length;
     const parts = commentsDatabase[lineIndex].split('|');
     
     if (parts.length >= 3) {
