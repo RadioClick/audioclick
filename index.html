@@ -1432,10 +1432,12 @@ fetch('Comentarios audioclick 10k.txt')
     commentsDatabase = data.split('\n').filter(l => l.trim());
     commentsLoaded = true;
     console.log(`✅ ${commentsDatabase.length} comentarios cargados`);
+    // Inicializar comentarios inmediatamente después de cargar
+    updateComments();
   })
   .catch(err => {
-    console.log('⚠️ Usando comentarios de respaldo');
-    commentsLoaded = true;
+    console.log('⚠️ Error cargando comentarios:', err);
+    commentsLoaded = false;
   });
 
 let comments = [];
@@ -1765,7 +1767,7 @@ function renderComments() {
 }
 
 // Actualizar comentarios cada 1 minuto para rotar 10 comentarios diferentes
-updateComments();
+// (updateComments se llama automáticamente cuando se carga el archivo)
 setInterval(updateComments, 60000);
 
 
