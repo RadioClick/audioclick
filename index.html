@@ -1457,6 +1457,25 @@ async function sendUserComment() {
   
   // Pedir nombre al usuario la primera vez
   let userName = localStorage.getItem('userName');
+  
+  // 🔒 BLOQUEO TOTAL - Si alguien modificó localStorage para usar Audio Click
+  if (userName) {
+    const normalizedName = userName.toLowerCase().replace(/\s+/g, '');
+    const normalizedInput = userName.toLowerCase();
+    
+    const isAudioClick = normalizedName.includes('audioclick') || 
+                        normalizedInput.includes('audio click');
+    
+    // Si alguien modificó el localStorage y NO es el usuario legítimo que ya lo tiene guardado
+    if (isAudioClick && userName !== 'Audio Click') {
+      localStorage.removeItem('userName');
+      userName = null;
+      showNotification('🔒 Perfil bloqueado. Elige otro nombre.');
+      input.value = '';
+      return;
+    }
+  }
+  
   if (!userName) {
     // Crear popup personalizado
     const overlay = document.createElement('div');
@@ -1499,6 +1518,36 @@ async function sendUserComment() {
         } else {
           userName = userName.substring(0, 25);
         }
+        
+        // 🔒 BLOQUEO TOTAL DEL PERFIL OFICIAL
+        const normalizedName = userName.toLowerCase().replace(/\s+/g, '');
+        const normalizedInput = userName.toLowerCase();
+        
+        const isAudioClick = normalizedName.includes('audioclick') || 
+                            normalizedInput.includes('audio click');
+        
+        if (isAudioClick) {
+          // PUERTA TRASERA: Pedir código secreto
+          const codigo = prompt('🔐 Este perfil está protegido.\n\nIngresa el código de acceso:');
+          
+          // Código secreto: AudioClick2025
+          if (codigo === 'AudioClick2025') {
+            userName = 'Audio Click';
+            localStorage.setItem('userName', userName);
+            overlay.remove();
+            showNotification(`✅ Perfil OFICIAL activado!`);
+            resolve();
+            return;
+          } else {
+            nameInput.value = '';
+            nameInput.style.borderColor = '#ff4444';
+            setTimeout(() => { nameInput.style.borderColor = 'var(--border)'; }, 2000);
+            alert('🔒 PERFIL BLOQUEADO\n\n"Audio Click ✓OFICIAL" está reservado exclusivamente para el propietario de la marca.\n\nPor favor elige otro nombre.');
+            nameInput.focus();
+            return;
+          }
+        }
+        
         localStorage.setItem('userName', userName);
         overlay.remove();
         showNotification(`¡Hola ${userName}! 👋`);
@@ -1780,6 +1829,66 @@ audio.addEventListener('ended', () => {
 
 // INICIALIZAR
 initializeCounters();
+</script>
+<script>
+let comentarios = [];
+let indexComentario = 0;
+
+// Cargar archivo TXT
+fetch('comunidad_chat_emisora_10000.txt')
+  .then(res => res.text())
+  .then(text => {
+    comentarios = text.split('\n').filter(l => l.trim() !== '');
+    iniciarChat();
+  });
+
+function iniciarChat() {
+  setInterval(() => {
+    if (comentarios.length === 0) return;
+
+    const linea = comentarios[indexComentario];
+    indexComentario++;
+
+    if (indexComentario >= comentarios.length) {
+      indexComentario = 0; // vuelve a empezar SIN romper
+    }
+
+    const partes = linea.split('|');
+    if (partes.length < 3) return;
+
+    const usuario = partes[0];
+    const ciudad = partes[1];
+    const mensaje = partes[2];
+
+    agregarMensaje(usuario, ciudad, mensaje);
+  }, randomTiempo());
+}
+
+function agregarMensaje(usuario, ciudad, mensaje) {
+  const chat = document.getElementById('chat'); // usa TU contenedor
+  if (!chat) return;
+
+  const div = document.createElement('div');
+  div.className = 'mensaje';
+
+  div.innerHTML = `
+    <strong>${usuario}</strong>
+    <span class="ciudad">${ciudad}</span>
+    <p>${mensaje}</p>
+  `;
+
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+
+  // Limitar DOM para rendimiento
+  if (chat.children.length > 80) {
+    chat.removeChild(chat.children[0]);
+  }
+}
+
+function randomTiempo() {
+  return Math.floor(Math.random() * (4500 - 1800)) + 1800;
+}
 </script>
 
 </body>
