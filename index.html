@@ -1700,28 +1700,34 @@ async function fetchUserComments() {
 // Verificar nuevos comentarios cada 5 segundos
 setInterval(fetchUserComments, 5000);
 
-// SINCRONÍA GLOBAL DE COMENTARIOS - LECTURA SECUENCIAL DE 10,000 LÍNEAS
-let currentCommentIndex = 0; // Índice actual en la base de datos
-
+// SINCRONÍA GLOBAL DE COMENTARIOS - Como las cápsulas de audio
 function generateSyncedComments() {
   if (!commentsLoaded || commentsDatabase.length === 0) return [];
   
   const syncedComments = [];
   const totalComments = commentsDatabase.length;
   
-  // Generar 10 comentarios consecutivos desde la posición actual
+  // Sincronización global: calcular posición basada en tiempo actual
+  const now = Date.now();
+  const ROTATION_INTERVAL = 30000; // Cambio cada 30 segundos
+  const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
+  
+  // Calcular índice global sincronizado
+  const intervalsSinceBase = Math.floor((now - BASE_TIME) / ROTATION_INTERVAL);
+  const globalIndex = intervalsSinceBase % totalComments;
+  
+  // Generar 10 comentarios consecutivos desde posición global
   for (let i = 0; i < 10; i++) {
-    const lineIndex = (currentCommentIndex + i) % totalComments;
+    const lineIndex = (globalIndex + i) % totalComments;
     const parts = commentsDatabase[lineIndex].split('|');
     
     if (parts.length >= 3) {
       const name = parts[0].trim();
-      // Ya no mostramos ubicación al lado del nombre (siempre vacía ahora)
       
       syncedComments.push({
         author: name,
         text: parts[2].trim(),
-        time: i === 0 ? 'Ahora' : `Hace ${i} min`,
+        time: i === 0 ? 'Ahora' : `Hace ${i * 30}s`,
         isEmoji: false,
         isUser: false
       });
@@ -1735,16 +1741,13 @@ function updateComments() {
   // Guardar comentarios de usuarios
   const userComments = comments.filter(c => c.isUser);
   
-  // Regenerar solo comentarios programados (desde posición actual)
+  // Regenerar comentarios sincronizados globalmente
   const programmedComments = generateSyncedComments();
   
   // Combinar: usuarios primero, luego programados
   comments = [...userComments, ...programmedComments].slice(0, maxComments);
   
   renderComments();
-  
-  // IMPORTANTE: Avanzar el índice para el próximo ciclo (lectura secuencial progresiva)
-  currentCommentIndex = (currentCommentIndex + 1) % commentsDatabase.length;
 }
 
 function renderComments() {
