@@ -1891,6 +1891,58 @@ function tiempoAleatorio() {
   return Math.floor(Math.random() * (4200 - 1800)) + 1800;
 }
 </script>
+<script>
+(function () {
+
+  const chat = document.getElementById('commentsContainer');
+  if (!chat) return;
+
+  // Forzar comportamiento estable sin tocar CSS existente
+  chat.style.display = 'flex';
+  chat.style.flexDirection = 'column';
+  chat.style.justifyContent = 'flex-end';
+  chat.style.overflow = 'hidden';
+
+  let comentarios = [];
+  let index = Math.floor(Math.random() * 500); // no inicia en 0
+
+  fetch('comunidad_chat_emisora_10000.txt', { cache: 'no-store' })
+    .then(r => r.text())
+    .then(t => {
+      comentarios = t.split('\n').filter(l => l.trim());
+      comentarios.sort(() => Math.random() - 0.5);
+      ciclo();
+    })
+    .catch(() => {});
+
+  function ciclo() {
+    const linea = comentarios[index++];
+    if (index >= comentarios.length) index = 0;
+
+    const p = linea.indexOf(':');
+    if (p === -1) return setTimeout(ciclo, espera());
+
+    const user = linea.slice(0, p).trim();
+    const msg  = linea.slice(p + 1).trim();
+
+    const d = document.createElement('div');
+    d.className = 'comment';
+    d.innerHTML = `<strong>${user}</strong><p>${msg}</p>`;
+    chat.appendChild(d);
+
+    if (chat.children.length > 60) {
+      chat.removeChild(chat.children[0]);
+    }
+
+    setTimeout(ciclo, espera());
+  }
+
+  function espera() {
+    return Math.floor(Math.random() * 3000) + 2000;
+  }
+
+})();
+</script>
 
 </body>
 </html>
