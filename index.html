@@ -1716,11 +1716,10 @@ function generateSyncedComments() {
     
     if (parts.length >= 3) {
       const name = parts[0].trim();
-      const location = parts[1].trim();
-      const authorDisplay = location ? `${name} · ${location}` : name;
+      // Ya no mostramos ubicación al lado del nombre (siempre vacía ahora)
       
       syncedComments.push({
-        author: authorDisplay,
+        author: name,
         text: parts[2].trim(),
         time: i === 0 ? 'Ahora' : `Hace ${i} min`,
         isEmoji: false,
