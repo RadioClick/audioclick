@@ -1426,7 +1426,7 @@ let commentsDatabase = [];
 let commentsLoaded = false;
 
 // Cargar base de datos de comentarios desde archivo
-fetch('Comentarios audioclick 10k.txt')
+fetch('comentarios_audioclick_10k.txt')
   .then(r => r.text())
   .then(data => {
     commentsDatabase = data.split('\n').filter(l => l.trim());
@@ -1766,9 +1766,8 @@ function renderComments() {
   }).join('');
 }
 
-// Actualizar comentarios cada 1 minuto para rotar 10 comentarios diferentes
-// (updateComments se llama automáticamente cuando se carga el archivo)
-setInterval(updateComments, 60000);
+// Actualizar cada 30 segundos para rotar comentarios (10,000 líneas se recorren en ~83 horas)
+setInterval(updateComments, 30000);
 
 
 // COMPARTIR
