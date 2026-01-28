@@ -1426,7 +1426,7 @@ let commentsDatabase = [];
 let commentsLoaded = false;
 
 // Cargar base de datos de comentarios desde archivo
-fetch('comentarios_audioclick_10k.txt')
+fetch('Comentarios audioclick 10k.txt')
   .then(r => r.text())
   .then(data => {
     commentsDatabase = data.split('\n').filter(l => l.trim());
@@ -1713,8 +1713,12 @@ function generateSyncedComments() {
     const parts = commentsDatabase[lineIndex].split('|');
     
     if (parts.length >= 3) {
+      const name = parts[0].trim();
+      const location = parts[1].trim();
+      const authorDisplay = location ? `${name} · ${location}` : name;
+      
       syncedComments.push({
-        author: parts[0].trim(),
+        author: authorDisplay,
         text: parts[2].trim(),
         time: i === 0 ? 'Ahora' : `Hace ${i} min`,
         isEmoji: false,
