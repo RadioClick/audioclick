@@ -1709,7 +1709,7 @@ function generateSyncedComments() {
   
   // Sincronización global: calcular posición basada en tiempo actual
   const now = Date.now();
-  const ROTATION_INTERVAL = 30000; // Cambio cada 30 segundos
+  const ROTATION_INTERVAL = 8000; // Cambio cada 8 segundos (más dinámico)
   const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
   
   // Calcular índice global sincronizado
@@ -1727,7 +1727,7 @@ function generateSyncedComments() {
       syncedComments.push({
         author: name,
         text: parts[2].trim(),
-        time: i === 0 ? 'Ahora' : `Hace ${i * 30}s`,
+        time: i === 0 ? 'Ahora' : `Hace ${i * 8}s`,
         isEmoji: false,
         isUser: false
       });
@@ -1768,8 +1768,8 @@ function renderComments() {
   }).join('');
 }
 
-// Actualizar cada 30 segundos para rotar comentarios (10,000 líneas se recorren en ~83 horas)
-setInterval(updateComments, 30000);
+// Actualizar cada 8 segundos para ver nuevos comentarios (10,000 líneas se recorren en ~22 horas)
+setInterval(updateComments, 8000);
 
 
 // COMPARTIR
