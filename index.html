@@ -1439,7 +1439,7 @@ fetch('comentarios_audioclick.txt')
   });
 
 let comments = [];
-const maxComments = 10;
+const maxComments = 7;
 
 // FIREBASE REALTIME COMMENTS
 const COMMENTS_URL = 'https://audio-click-default-rtdb.firebaseio.com/comments.json';
@@ -1658,8 +1658,8 @@ function generateSyncedComments() {
   const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
   const syncedComments = [];
   
-  for (let i = 0; i < 10; i++) {
-    const minutesAgo = i * 3;
+  for (let i = 0; i < 7; i++) {
+    const minutesAgo = i * 1;
     const commentTime = now - (minutesAgo * MINUTE_MS);
     const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
     
