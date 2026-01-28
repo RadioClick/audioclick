@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="description" content="Radio Click - Medellín, Colombia desde Medellín, Colombia. Noticias actualizadas diariamente.">
+<meta name="description" content="Radio Click - Medellín, Colombia. 10,000 comentarios únicos en tiempo real. Noticias actualizadas diariamente.">
 <meta name="keywords" content="Radio Click, Veracruz, Medellín, Colombia, noticias, radio online, cápsulas informativas">
 <meta name="author" content="Radio Click">
 <meta property="og:title" content="Radio Click - Cápsulas Informativas">
@@ -1426,7 +1426,7 @@ let commentsDatabase = [];
 let commentsLoaded = false;
 
 // Cargar base de datos de comentarios desde archivo
-fetch('comentarios_audioclick.txt')
+fetch('comentarios_audioclick_10k.txt')
   .then(r => r.text())
   .then(data => {
     commentsDatabase = data.split('\n').filter(l => l.trim());
@@ -1698,30 +1698,25 @@ async function fetchUserComments() {
 // Verificar nuevos comentarios cada 5 segundos
 setInterval(fetchUserComments, 5000);
 
-// SINCRONÍA GLOBAL DE COMENTARIOS POR TIMESTAMP
+// SINCRONÍA GLOBAL DE COMENTARIOS - LECTURA SECUENCIAL DE 10,000 LÍNEAS
+let currentCommentIndex = 0; // Índice actual en la base de datos
+
 function generateSyncedComments() {
   if (!commentsLoaded || commentsDatabase.length === 0) return [];
   
-  const now = Date.now();
-  const MINUTE_MS = 60000;
-  const BASE_TIME = new Date('2026-01-23T00:00:00').getTime();
   const syncedComments = [];
+  const totalComments = commentsDatabase.length;
   
+  // Generar 10 comentarios consecutivos desde la posición actual
   for (let i = 0; i < 10; i++) {
-    const minutesAgo = i * 1; // Comentarios cada 1 minuto para mantener la caja viva
-    const commentTime = now - (minutesAgo * MINUTE_MS);
-    const minutesSinceBase = Math.floor((commentTime - BASE_TIME) / MINUTE_MS);
-    
-    // Usar hash multiplicativo con número coprimo (3001 es coprimo con 5000)
-    // Esto asegura distribución uniforme en TODAS las líneas del archivo
-    const lineIndex = (minutesSinceBase * 3001) % commentsDatabase.length;
+    const lineIndex = (currentCommentIndex + i) % totalComments;
     const parts = commentsDatabase[lineIndex].split('|');
     
     if (parts.length >= 3) {
       syncedComments.push({
         author: parts[0].trim(),
         text: parts[2].trim(),
-        time: minutesAgo === 0 ? 'Ahora' : `Hace ${minutesAgo} min`,
+        time: i === 0 ? 'Ahora' : `Hace ${i} min`,
         isEmoji: false,
         isUser: false
       });
@@ -1735,13 +1730,16 @@ function updateComments() {
   // Guardar comentarios de usuarios
   const userComments = comments.filter(c => c.isUser);
   
-  // Regenerar solo comentarios programados
+  // Regenerar solo comentarios programados (desde posición actual)
   const programmedComments = generateSyncedComments();
   
   // Combinar: usuarios primero, luego programados
   comments = [...userComments, ...programmedComments].slice(0, maxComments);
   
   renderComments();
+  
+  // IMPORTANTE: Avanzar el índice para el próximo ciclo (lectura secuencial progresiva)
+  currentCommentIndex = (currentCommentIndex + 1) % commentsDatabase.length;
 }
 
 function renderComments() {
