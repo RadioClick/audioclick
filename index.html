@@ -1727,7 +1727,7 @@ function generateSyncedComments() {
       syncedComments.push({
         author: name,
         text: parts[2].trim(),
-        time: i === displayedComments.length - 1 ? 'Ahora' : `Hace ${Math.floor((displayedComments.length - 1 - i) * 53/60)}min`,
+        time: i === 0 ? 'Ahora' : `Hace ${Math.floor(i * 53/60)}min`,
         isEmoji: false,
         isUser: false
       });
